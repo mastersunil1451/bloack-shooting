@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bullet Defender</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: linear-gradient(to bottom, #87CEEB, #FFFFFF);
+      overflow: hidden;
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      aspect-ratio: 1 / 1;
+      background: linear-gradient(to right, #5f2c82, #49a09d);
+    }
+
+    .screen {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.9);
+      color: #333;
+      font-size: 2em;
+      gap: 20px;
+    }
+
+    button {
+      padding: 15px 30px;
+      font-size: 0.6em;
+      background: #007BFF;
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 5px;
+      width: 200px;
+    }
+
+    #gameOverScreen {
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <!-- Home Screen -->
+  <div id="homeScreen" class="screen">
+    <h1>Bullet Defender</h1>
+    <button id="startButton">Start Game</button>
+    <button id="howToPlayButton">How to Play</button>
+  </div>
+
+  <!-- Game Canvas -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Game Over Screen -->
+  <div id="gameOverScreen" class="screen" style="display: none;">
+    <div id="finalScore"></div>
+    <button id="restartButton">Restart</button>
+    <button id="menuButton">Back to Menu</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const homeScreen = document.getElementById('homeScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const finalScore = document.getElementById('finalScore');
+    const startButton = document.getElementById('startButton');
+    const howToPlayButton = document.getElementById('howToPlayButton');
+    const restartButton = document.getElementById('restartButton');
+    const menuButton = document.getElementById('menuButton');
+
+    let width, height;
+    const resize = () => {
+      width = canvas.width = Math.min(window.innerWidth, window.innerHeight);
+      height = canvas.height = width;
+    };
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Game variables
+    let score = 0;
+    let escaped = 0;
+    const maxEscaped = 10;
+    let gameOver = true;
+    const bullets = [];
+    const enemies = [];
+    let enemySpeed = 1.5;
+    const maxEnemySpeed = 4;
+    let spawnInterval;
+
+    // Event listeners
+    canvas.addEventListener('touchstart', handleTap);
+    canvas.addEventListener('mousedown', handleTap);
+
+    function handleTap(e) {
+      if (gameOver) return;
+      e.preventDefault();
+      
+      const rect = canvas.getBoundingClientRect();
+      const tapX = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const tapY = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+
+      const dx = tapX - width/2;
+      const dy = tapY - height/2;
+      const distance = Math.sqrt(dx*dx + dy*dy);
+      
+      if (distance === 0) return;
+
+      const bulletSpeed = 10;
+      const bullet = {
+        x: width/2,
+        y: height/2,
+        dx: (dx / distance) * bulletSpeed,
+        dy: (dy / distance) * bulletSpeed
+      };
+      bullets.push(bullet);
+    }
+
+    function spawnEnemy() {
+      if (gameOver) return;
+      
+      const direction = Math.floor(Math.random() * 4);
+      let x, y, dx, dy;
+
+      switch(direction) {
+        case 0: // Left to right
+          x = -30;
+          y = Math.random() * height;
+          dx = enemySpeed;
+          dy = 0;
+          break;
+        case 1: // Right to left
+          x = width + 30;
+          y = Math.random() * height;
+          dx = -enemySpeed;
+          dy = 0;
+          break;
+        case 2: // Bottom to top
+          x = Math.random() * width;
+          y = height + 30;
+          dx = 0;
+          dy = -enemySpeed;
+          break;
+        case 3: // Top to bottom
+          x = Math.random() * width;
+          y = -30;
+          dx = 0;
+          dy = enemySpeed;
+          break;
+      }
+
+      const type = Math.random() < 0.5 ? 'circle' : 'square';
+      enemies.push({x, y, dx, dy, type, size: 30});
+      enemySpeed = Math.min(maxEnemySpeed, enemySpeed + 0.03);
+    }
+
+    function update() {
+      if (gameOver) return;
+
+      // Update bullets
+      bullets.forEach((bullet, index) => {
+        bullet.x += bullet.dx;
+        bullet.y += bullet.dy;
+        if (bullet.x < 0 || bullet.x > width || bullet.y < 0 || bullet.y > height) {
+          bullets.splice(index, 1);
+        }
+      });
+
+      // Update enemies
+      enemies.forEach((enemy, index) => {
+        enemy.x += enemy.dx;
+        enemy.y += enemy.dy;
+
+        // Check if escaped
+        if (enemy.x < -50 || enemy.x > width + 50 ||
+            enemy.y < -50 || enemy.y > height + 50) {
+          enemies.splice(index, 1);
+          escaped++;
+          if (escaped >= maxEscaped) endGame();
+        }
+      });
+
+      // Collision detection
+      bullets.forEach((bullet, bIndex) => {
+        enemies.forEach((enemy, eIndex) => {
+          const dx = bullet.x - enemy.x;
+          const dy = bullet.y - enemy.y;
+          const distance = Math.sqrt(dx*dx + dy*dy);
+          if (distance < enemy.size) {
+            bullets.splice(bIndex, 1);
+            enemies.splice(eIndex, 1);
+            score++;
+          }
+        });
+      });
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, width, height);
+
+      // Draw crosshair
+      ctx.beginPath();
+      ctx.arc(width/2, height/2, 5, 0, Math.PI*2);
+      ctx.fillStyle = 'red';
+      ctx.fill();
+
+      // Draw bullets
+      ctx.fillStyle = 'red';
+      bullets.forEach(bullet => {
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI*2);
+        ctx.fill();
+      });
+
+      // Draw enemies
+      enemies.forEach(enemy => {
+        ctx.fillStyle = 'blue';
+        ctx.beginPath();
+        if (enemy.type === 'circle') {
+          ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI*2);
+        } else {
+          ctx.rect(enemy.x - enemy.size/2, enemy.y - enemy.size/2, enemy.size, enemy.size);
+        }
+        ctx.fill();
+      });
+
+      // Draw score
+      ctx.fillStyle = 'black';
+      ctx.font = '20px Arial';
+      ctx.fillText(`Score: ${score}`, 10, 30);
+      ctx.fillText(`Escaped: ${escaped}/${maxEscaped}`, 10, 60);
+    }
+
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function startGame() {
+      // Reset game state
+      score = 0;
+      escaped = 0;
+      enemySpeed = 1.5;
+      bullets.length = 0;
+      enemies.length = 0;
+      gameOver = false;
+      
+      // Show game canvas and hide other screens
+      homeScreen.style.display = 'none';
+      gameOverScreen.style.display = 'none';
+      canvas.style.display = 'block';
+      
+      // Start spawning enemies
+      clearInterval(spawnInterval);
+      spawnInterval = setInterval(spawnEnemy, 1500);
+      gameLoop();
+    }
+
+    function endGame() {
+      gameOver = true;
+      clearInterval(spawnInterval);
+      finalScore.textContent = `Final Score: ${score}`;
+      canvas.style.display = 'none'; // Hide canvas
+      gameOverScreen.style.display = 'flex'; // Show game over screen
+    }
+
+    // Initial setup
+    canvas.style.display = 'none';
+    gameOverScreen.style.display = 'none';
+    homeScreen.style.display = 'flex';
+
+    // Button listeners
+    startButton.addEventListener('click', startGame);
+    howToPlayButton.addEventListener('click', () => {
+      alert('How to Play:\n- Tap anywhere to shoot bullets towards that direction\n- Bullets fire from center crosshair\n- Enemies come from all directions\n- Destroy enemies before they escape\n- Game ends when 10 enemies escape');
+    });
+    restartButton.addEventListener('click', startGame);
+    menuButton.addEventListener('click', () => {
+      gameOverScreen.style.display = 'none';
+      homeScreen.style.display = 'flex';
+    });
+  </script>
+</body>
+</html>
