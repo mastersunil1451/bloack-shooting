@@ -107,6 +107,9 @@
     let enemySpeed = 1.5;
     const maxEnemySpeed = 4;
     let spawnInterval;
+    
+    // फायरिंग ओरिजिन के लिए नया रेडियस (अब बड़ा किया गया है)
+    const firingOriginRadius = 20;
 
     // Event listeners
     canvas.addEventListener('touchstart', handleTap);
@@ -200,7 +203,17 @@
         }
       });
 
-      // Collision detection
+      // एनीमी और फायरिंग ओरिजिन के बीच टक्कर का चेक
+      enemies.forEach(enemy => {
+        const dx = enemy.x - width/2;
+        const dy = enemy.y - height/2;
+        const distance = Math.sqrt(dx*dx + dy*dy);
+        if (distance < enemy.size + firingOriginRadius) {
+          endGame();
+        }
+      });
+
+      // Collision detection between bullets and enemies
       bullets.forEach((bullet, bIndex) => {
         enemies.forEach((enemy, eIndex) => {
           const dx = bullet.x - enemy.x;
@@ -218,9 +231,9 @@
     function draw() {
       ctx.clearRect(0, 0, width, height);
 
-      // Draw crosshair
+      // Draw firing origin (बड़ा किया गया सर्कल)
       ctx.beginPath();
-      ctx.arc(width/2, height/2, 5, 0, Math.PI*2);
+      ctx.arc(width/2, height/2, firingOriginRadius, 0, Math.PI*2);
       ctx.fillStyle = 'red';
       ctx.fill();
 
@@ -293,7 +306,7 @@
     // Button listeners
     startButton.addEventListener('click', startGame);
     howToPlayButton.addEventListener('click', () => {
-      alert('How to Play:\n- Tap anywhere to shoot bullets towards that direction\n- Bullets fire from center crosshair\n- Enemies come from all directions\n- Destroy enemies before they escape\n- Game ends when 10 enemies escape');
+      alert('How to Play:\n- Tap anywhere to shoot bullets towards that direction\n- Bullets fire from center crosshair\n- Enemies come from all directions\n- Destroy enemies before they escape\n- Game ends when 10 enemies escape or an enemy touches the firing origin.');
     });
     restartButton.addEventListener('click', startGame);
     menuButton.addEventListener('click', () => {
